@@ -1,11 +1,51 @@
 import streamlit as st
+import pandas as pd
+import json
+import streamlit as st
 import os
 import zipfile
 import time
 import shutil
 
-uploaded_files = st.file_uploader("批量上传文件", accept_multiple_files=True)
-df = ['北京环球度假区',
+mul_sel = st.sidebar.selectbox(options=['景点图片重命名','json转csv'],label= '选择工具')
+if mul_sel == 'json转csv':
+    st.title("JSON to csv Converter")
+
+    # 文本输入框
+    json_data = st.text_area("请输入 JSON 数据：")
+    excel = st.radio(options= ['是','否'],label= '上传excel匹配顺序',index = 1,key=11)
+    if excel == '是':
+        d1 = st.file_uploader(label = '上传csv')
+        if d1 is not None:
+            df_excel = pd.read_csv(d1)
+            col = st.selectbox(options=df_excel.columns,label='选择匹配列',index=0)
+
+    if json_data:
+        try:
+            data_dict = json.loads(json_data)
+            #df = pd.DataFrame.from_dict(data_dict, orient='index').reset_index()
+            df = pd.DataFrame([(key, value) for key, value in data_dict.items()], columns=['景点名', 'json结果'])
+            df.columns = ['景点名称', 'json结果']
+            types = st.selectbox(options=['是','否'],label= 'list是否合并',index = 1,key = 200)
+            if types == '是':
+                split_str = st.text_input(label='输入分割符')
+                df['json结果']  = df['json结果'].apply(lambda x : split_str.join(x))
+            
+            if excel == '是':
+                df = pd.merge(left=df_excel[[col]],right=df,how='left',left_on=col,right_on='景点名称')
+        
+            st.download_button(
+                label="下载为 csv 文件",
+                data=df.to_csv(index=False),
+                file_name='景点解析.csv',
+            )
+                
+        except json.JSONDecodeError:
+            st.error("输入的 JSON 数据格式不正确。")
+            
+if mul_sel == '景点图片重命名':
+    uploaded_files = st.file_uploader("批量上传文件", accept_multiple_files=True)
+    df = ['北京环球度假区',
  '故宫博物院',
  '八达岭长城',
  '中国国家博物馆',
@@ -129,43 +169,43 @@ df = ['北京环球度假区',
  '北京潘家园古玩城',
  '灵境胡同']
 
-site_name = st.selectbox(options=df,label = '选择景点' )
-types = st.selectbox(options=['打卡机位','打卡姿势'],label = '打卡类型' )
+    site_name = st.selectbox(options=df,label = '选择景点' )
+    types = st.selectbox(options=['打卡机位','打卡姿势'],label = '打卡类型' )
 
-if uploaded_files:
-    st.write(len(uploaded_files))
-    target_directory = './renamed_files/'
-    if os.path.exists(target_directory):
-        try:
-            shutil.rmtree(target_directory)
-        except PermissionError:
-            st.error(f"没有权限删除目录 {target_directory}。")
-        except OSError as e:
-            st.error(f"删除目录时出现错误：{e}")
-    os.makedirs(target_directory)
+    if uploaded_files:
+        st.write(len(uploaded_files))
+        target_directory = './renamed_files/'
+        if os.path.exists(target_directory):
+            try:
+                shutil.rmtree(target_directory)
+            except PermissionError:
+                st.error(f"没有权限删除目录 {target_directory}。")
+            except OSError as e:
+                st.error(f"删除目录时出现错误：{e}")
+        os.makedirs(target_directory)
 
-    for index, uploaded_file in enumerate(uploaded_files):
-        old_filename = uploaded_file.name
-        base_name, extension = os.path.splitext(old_filename)
-        time.sleep(1)
-        timestamp = int(time.time())
-        new_filename = f'{site_name}_{types}_{timestamp}{extension}'
-        file_path = os.path.join(target_directory, new_filename)
-        print(file_path)
-        with open(file_path, 'wb') as f:
-            f.write(uploaded_file.read())
+        for index, uploaded_file in enumerate(uploaded_files):
+            old_filename = uploaded_file.name
+            base_name, extension = os.path.splitext(old_filename)
+            time.sleep(1)
+            timestamp = int(time.time())
+            new_filename = f'{site_name}_{types}_{timestamp}{extension}'
+            file_path = os.path.join(target_directory, new_filename)
+            print(file_path)
+            with open(file_path, 'wb') as f:
+                f.write(uploaded_file.read())
 
-        st.success(f'成功上传并重命名 {len(uploaded_files)} 个文件到 {target_directory}。')
+            st.success(f'成功上传并重命名 {len(uploaded_files)} 个文件到 {target_directory}。')
 
-    # 添加下载按钮
-    if st.button('下载所有文件'):
-        zip_filename = site_name + '.zip'
-        with zipfile.ZipFile(zip_filename, 'w') as zipf:
-            for root, dirs, files in os.walk(target_directory):
-                for file in files:
-                    file_path = os.path.join(root, file)
-                    zipf.write(file_path, os.path.relpath(file_path, target_directory))
+        # 添加下载按钮
+        if st.button('下载所有文件'):
+            zip_filename = site_name + '.zip'
+            with zipfile.ZipFile(zip_filename, 'w') as zipf:
+                for root, dirs, files in os.walk(target_directory):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        zipf.write(file_path, os.path.relpath(file_path, target_directory))
 
-        with open(zip_filename, 'rb') as f:
-            bytes_data = f.read()
-            st.download_button(label='点击下载', data=bytes_data, file_name=zip_filename)
+            with open(zip_filename, 'rb') as f:
+                bytes_data = f.read()
+                st.download_button(label='点击下载', data=bytes_data, file_name=zip_filename)
