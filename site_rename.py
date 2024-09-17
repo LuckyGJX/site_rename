@@ -6,8 +6,30 @@ import os
 import zipfile
 import time
 import shutil
+import ast
+import hashlib
+import requests
+#获取经纬度
+def get_lat_lon(addr,key):
+    para = {
+        'key': key,  # 请替换为你的高德地图API Key
+        'address': addr
+    }
+    url = 'https://restapi.amap.com/v3/geocode/geo?'  # 高德地图地理编码API服务地址
+    result = requests.get(url, para).json()
+    print(result)
+    if result['geocodes'] and "geocodes" in list(result.keys()):
+        lon_lat = result['geocodes'][0]['location']
+        lon, lat = lon_lat.split(',')
+        return float(lon), float(lat)
+    return None, None
+def md5(text):
+    # 创建一个MD5散列对象
+    hash_object = hashlib.md5(text.encode())
+    # hexdigest()方法返回散列的十六进制表示
+    return hash_object.hexdigest()
 
-mul_sel = st.sidebar.selectbox(options=['景点图片重命名','json转csv'],label= '选择工具')
+mul_sel = st.sidebar.selectbox(options=['景点图片重命名','json转csv','数据处理'],label= '选择工具')
 if mul_sel == 'json转csv':
     st.title("JSON to csv Converter")
 
@@ -42,7 +64,58 @@ if mul_sel == 'json转csv':
                 
         except json.JSONDecodeError:
             st.error("输入的 JSON 数据格式不正确。")
-            
+ 
+if mul_sel == '数据处理':
+    tools = st.radio("选择处理工具",['list转换csv','md5加密','经纬度查询'])
+    if tools == 'list转换csv':
+         list_d = st.text_area("请输入 list 数据：")
+         #st.write(pd.DataFrame({"数据":list_data})  )
+         if list_d:
+            try:
+                list_data = ast.literal_eval(list_d)
+                df = pd.DataFrame({"数据":list_data})    
+                st.download_button(
+                    label="下载为 csv 文件",
+                    data=df.to_csv(index=False),
+                    file_name='list解析.csv'
+                )
+                    
+            except:
+                st.error("输入的 list 数据格式不正确。")
+    
+    if tools == 'md5加密':
+        d1 = st.file_uploader(label = '上传csv')
+        if d1 is not None:
+            df_excel = pd.read_csv(d1)
+            col = st.selectbox(options=df_excel.columns,label='选择匹配列',index=0)
+            df_excel['md5_data'] = df_excel[col].apply(md5)
+            st.download_button(
+                label="下载为 csv 文件",
+                data=df_excel.to_csv(index=False),
+                file_name='md5.csv')
+
+    if tools == '经纬度查询':
+        city = st.text_input(label="输入城市")
+        gd_key = st.text_input(label="输入高德apikey")
+
+        d1 = st.file_uploader(label = '上传地址csv')
+        if d1 is not None:
+            df_excel = pd.read_csv(d1)
+            col = st.selectbox(options=df_excel.columns,label='选择匹配地址',index=0)
+            if st.button("开始查询"):
+                lng_lat = []
+                for i in df_excel[col]:
+                    lng_lat.append(get_lat_lon(city + i,key = gd_key))
+                df_excel['lng_lat'] = lng_lat
+                # 提取经度和纬度分别作为单独的列
+                df_excel['longitude'] = df_excel['lng_lat'].apply(lambda coord: coord[0])
+                df_excel['latitude'] = df_excel['lng_lat'].apply(lambda coord: coord[1])
+
+                st.download_button(
+                    label="下载为 csv 文件",
+                    data=df_excel.to_csv(index=False),
+                    file_name='经纬度.csv')
+        
 if mul_sel == '景点图片重命名':
     uploaded_files = st.file_uploader("批量上传文件", accept_multiple_files=True)
     df = ['北京环球度假区',
@@ -171,6 +244,7 @@ if mul_sel == '景点图片重命名':
 
     site_name = st.selectbox(options=df,label = '选择景点' )
     types = st.selectbox(options=['打卡机位','打卡姿势'],label = '打卡类型' )
+    city = st.text_input(label="请输入城市名")
 
     if uploaded_files:
         st.write(len(uploaded_files))
@@ -189,7 +263,7 @@ if mul_sel == '景点图片重命名':
             base_name, extension = os.path.splitext(old_filename)
             time.sleep(1)
             timestamp = int(time.time())
-            new_filename = f'{site_name}_{types}_{timestamp}{extension}'
+            new_filename = f'{city}_{site_name}_{types}_{timestamp}{extension}'
             file_path = os.path.join(target_directory, new_filename)
             print(file_path)
             with open(file_path, 'wb') as f:
