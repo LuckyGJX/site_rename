@@ -29,6 +29,29 @@ def md5(text):
     # hexdigest()方法返回散列的十六进制表示
     return hash_object.hexdigest()
 
+
+#大模型经纬度加工
+def get_lng(x):
+    location  = x.split(",")
+    print(location)
+    if len(location) == 0:
+        return ""
+    if len(location) >1:
+        print(location)
+        return location[0]
+    else:
+        return ""
+def get_lat(x):
+    location  = x.split(",")
+    if len(location) == 0:
+        return None
+    if len(location) >1:
+        #print(location[1])
+        return location[1]
+    else:
+        return ""
+
+
 mul_sel = st.sidebar.selectbox(options=['景点图片重命名','json转csv','数据处理'],label= '选择工具')
 if mul_sel == 'json转csv':
     st.title("JSON to csv Converter")
@@ -66,7 +89,7 @@ if mul_sel == 'json转csv':
             st.error("输入的 JSON 数据格式不正确。")
  
 if mul_sel == '数据处理':
-    tools = st.radio("选择处理工具",['list转换csv','md5加密','经纬度查询'])
+    tools = st.radio("选择处理工具",['list转换csv','md5加密','经纬度查询','大模型经纬度处理'])
     if tools == 'list转换csv':
          list_d = st.text_area("请输入 list 数据：")
          #st.write(pd.DataFrame({"数据":list_data})  )
@@ -115,6 +138,27 @@ if mul_sel == '数据处理':
                     label="下载为 csv 文件",
                     data=df_excel.to_csv(index=False),
                     file_name='经纬度.csv')
+                
+    if tools == '大模型经纬度处理':
+         list_d = st.text_area("请输入 list 数据：")
+         #st.write(pd.DataFrame({"数据":list_data})  )
+         if list_d:
+            try:
+                list_data = ast.literal_eval(list_d)
+                df = pd.DataFrame(list_data)      
+                df['lng'] = df['poi_location'].apply(get_lng)
+                df['lat'] = df['poi_location'].apply(get_lat)      
+    
+                st.download_button(
+                    label="下载为 csv 文件",
+                    data=df.to_csv(index=False),
+                    file_name='list-经纬度结果.csv'
+                )
+                    
+            except:
+                st.error("输入的 list 数据格式不正确。")
+                
+                
         
 if mul_sel == '景点图片重命名':
     uploaded_files = st.file_uploader("批量上传文件", accept_multiple_files=True)
