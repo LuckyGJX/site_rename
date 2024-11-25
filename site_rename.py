@@ -50,7 +50,34 @@ def get_lat(x):
         return location[1]
     else:
         return ""
-
+        
+def get_gd_lnglat(url):
+    """
+    输入高德分享地址，返回经纬度
+    """
+    import urllib.parse
+    import requests
+    #url = "https://surl.amap.com/2nRQxUtlTbj9"
+    response = requests.get(url)
+    headers = response.headers
+    lat = response.request.path_url.split(",")[1]
+    lng = response.request.path_url.split(",")[2]
+    s = response.request.path_url
+    parts = s.split(',')
+    new_parts = []
+    for part in parts:
+        try:
+            decoded = urllib.parse.unquote(part)
+            new_parts.append(decoded)
+        except:
+            new_parts.append(part)
+    text = ','.join(new_parts)
+    res = {
+        "经度":lng,
+        "纬度":lat,
+        "文本":text        
+        }
+    return res
 
 mul_sel = st.sidebar.selectbox(options=['景点图片重命名','json转csv','数据处理'],label= '选择工具')
 if mul_sel == 'json转csv':
@@ -89,7 +116,7 @@ if mul_sel == 'json转csv':
             st.error("输入的 JSON 数据格式不正确。")
  
 if mul_sel == '数据处理':
-    tools = st.radio("选择处理工具",['list转换csv','md5加密','经纬度查询','大模型经纬度处理'])
+    tools = st.radio("选择处理工具",['list转换csv','md5加密','经纬度查询','大模型经纬度处理','高德分享地址经纬度查询'])
     if tools == 'list转换csv':
          list_d = st.text_area("请输入 list 数据：")
          #st.write(pd.DataFrame({"数据":list_data})  )
@@ -105,7 +132,11 @@ if mul_sel == '数据处理':
                     
             except:
                 st.error("输入的 list 数据格式不正确。")
-    
+    if tools == '高德分享地址经纬度查询':
+        int_url = st.text_input(label = "输入高德分享地址")
+        if st.button("查询经纬度"):
+            st.write(get_gd_lnglat(int_url))
+            
     if tools == 'md5加密':
         d1 = st.file_uploader(label = '上传csv')
         if d1 is not None:
